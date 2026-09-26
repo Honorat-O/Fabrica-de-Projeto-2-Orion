@@ -25,6 +25,10 @@ def getPatentes(patente, qtd_patentes):
 
     for i in range(qtd_patentes):
         patente = data["data"]["results"][i]
+
+        if not patente:
+            break
+        
         patentes.append(patente)
 
     return patentes

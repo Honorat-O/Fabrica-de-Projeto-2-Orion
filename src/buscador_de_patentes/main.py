@@ -14,17 +14,19 @@ def main():
             patente = st.text_input("Patente", type="search", placeholder="Insira uma patente aqui", label_visibility="collapsed")
             enviado = st.form_submit_button("Buscar")      
     
-    if enviado:
+    if enviado and patente:
         # Parametros do getPatentes(texto do input, quantidade total de patentes para serem buscadas)
         patentes = getPatentes(patente, itens)
         # Container de cards de patente
         with st.container():
             for i in range(itens_por_pagina):
+                if not patentes[i]:
+                    break;
+                
                 with st.container(key=i, horizontal_alignment="center", border=True):
                     st.write(f"{patentes[i]["title"]}")
                     st.write(f"{patentes[i]["pn"]}")
                     st.write(f"{patentes[i]["current_assignee"]}")
-                    st.button("Ver mais", key=f"Botão {i}")
 
 if __name__ == "__main__": 
     main()
