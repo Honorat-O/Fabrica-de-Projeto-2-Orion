@@ -17,16 +17,20 @@ def main():
     if enviado and patente:
         # Parametros do getPatentes(texto do input, quantidade total de patentes para serem buscadas)
         patentes = getPatentes(patente, itens)
-        # Container de cards de patente
-        with st.container():
-            for i in range(itens_por_pagina):
-                if not patentes[i]:
-                    break;
-                
-                with st.container(key=i, horizontal_alignment="center", border=True):
-                    st.write(f"{patentes[i]["title"]}")
-                    st.write(f"{patentes[i]["pn"]}")
-                    st.write(f"{patentes[i]["current_assignee"]}")
+
+        if not patentes:
+            st.write("Nenhuma patente foi encontrada.")
+        else:
+            # Container de cards de patente
+            with st.container():
+                for patente in patentes[:itens_por_pagina]:
+                    with st.container(horizontal_alignment="center", border=True):
+                        st.write(f"{patente.get("title", "Título não informado")}")
+                        st.write(f"{patente.get("pn", "PN não informado")}")
+                        st.write(f"{patente.get("current_assignee", "Não informado")}")
+
+    elif enviado and not patente:
+        st.write("Você precisa inserir alguma coisa na caixa de texto para buscar patentes")
 
 if __name__ == "__main__": 
     main()

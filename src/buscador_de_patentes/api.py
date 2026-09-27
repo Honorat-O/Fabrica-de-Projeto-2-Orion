@@ -19,16 +19,9 @@ def getPatentes(patente, qtd_patentes):
     }
 
     response = requests.post(url, json=payload, headers=headers)
+    response.raise_for_status()
 
-    data = response.json()
-    patentes = []
-
-    for i in range(qtd_patentes):
-        patente = data["data"]["results"][i]
-
-        if not patente:
-            break
-        
-        patentes.append(patente)
-
+    data = response.json()["data"]
+    patentes = data.get("results", [])
+    
     return patentes
