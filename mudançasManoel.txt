@@ -1,0 +1,12 @@
+esse é o código do Evandro que está no github, eu usei o
+".stremlit/config.toml" para deixar o tema escuro como padrão,
+depois usei o basico de html pra deixar o titulo das patentes maiores/em negrito,
+depois, adicionei também "SN: " e "Autors: ", e por último eu adicionei a data de
+publicação que aprendi a puxar pela api, só pedi ajuda do chat pra formatar certinho
+pois na api sai como "YYYYMMDD".
+
+--> Meta para o próximo dia é criar e implementar um número de pesquisas encontradas,
+ampliando o limite que atualmente é 10, e tentar adicionar mais palavras-chaves para
+pesquisas de patentes.
+
+Dia 29/09/2026 às 22:32
