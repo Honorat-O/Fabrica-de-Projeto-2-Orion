@@ -27,12 +27,14 @@ def main():
                 for patente in patentes[:itens_por_pagina]:
                     with st.container(horizontal_alignment="center", border=True):
                         titulo_patente = (f"{patente.get("title", "Título não informado")}")
+                        #aqui eu usei o st.markdown pra conseguir personalizar o texto do titulo, aumentando ele e deixando em negrito. Da pra fazer isso usando a função "st.markdown" com HTML
                         st.markdown(
                             f"<h2 style = 'font-size: 28px; font-weight: bold; '>{titulo_patente}</h2>",
                             unsafe_allow_html=True
                         )
                         st.write(f"SN: {patente.get("pn", "PN não informado")}")
                         st.write(f"Autors: {patente.get("current_assignee", "Não informado")}")
+                        #aqui eu vou colocar a publication date ("pbdt"), mas como ela estava em YYYYMMDD eu passei ela pra string e formatei com a função "formatar_data", puxando os números pelos índices
                         def formatar_data(data):
                             if not data:
                                 return "Data não informada"
