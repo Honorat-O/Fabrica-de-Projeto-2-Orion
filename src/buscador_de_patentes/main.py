@@ -1,6 +1,13 @@
 import streamlit as st
 from api import getPatentes
 import requests
+from componentes import mostrar_card
+
+st.set_page_config(
+    page_title="Orion | Buscador de Patentes",
+    page_icon="🔎",
+    layout="wide",
+)
 
 itens = 10;
 itens_por_pagina = 10;
@@ -8,12 +15,28 @@ maximo_paginas_visiveis = 5;
 paginas = itens // itens_por_pagina;
 
 def main():
-    # Container de Busca
-    with st.container(horizontal=True, horizontal_alignment="center"):
-        st.title("Busque sua patente aqui:")
-        with st.form("form_busca_patente", border=False):
-            patente = st.text_input("Patente", type="search", placeholder="Insira uma patente aqui", label_visibility="collapsed")
-            enviado = st.form_submit_button("Buscar")      
+    st.title("🔎 Searchent")
+    st.caption(
+        "Explore patentes e encontre tecnologias para seus projetos."
+    )
+
+    with st.form("form_busca_patente", border=False):
+        coluna_busca, coluna_botao = st.columns([5, 1])
+
+        with coluna_busca:
+            patente = st.text_input(
+                "Termo de busca",
+                placeholder="Digite apenas termos em inglês.EX: tractor, car, plant...",
+                label_visibility="collapsed",
+            )
+
+        with coluna_botao:
+            enviado = st.form_submit_button(
+                "Buscar",
+                use_container_width=True,
+            )
+
+    st.divider()    
     
     if not enviado:
         return
@@ -68,10 +91,7 @@ def main():
         return
 
     for resultado in patentes[:itens_por_pagina]:
-        with st.container(horizontal_alignment="center", border=True):
-            st.write(resultado.get("title", "Título não informado."))
-            st.write(resultado.get("pn", "PN não informado."))
-            st.write(resultado.get("current_assignee", "Não informado."))
-
+        mostrar_card(resultado)
+        
 if __name__ == "__main__":
     main()
