@@ -18,10 +18,25 @@ def getPatentes(patente, qtd_patentes):
         "query_text": f"TACD: {patente}"
     }
 
-    response = requests.post(url, json=payload, headers=headers)
+    response = requests.post(url, json=payload, headers=headers,timeout=(5,30))
     response.raise_for_status()
 
-    data = response.json()["data"]
-    patentes = data.get("results", [])
+    try:
+        body = response.json()
+        
+    except ValueError as erro:
+        raise ValueError("A API retornou uma resposta inválida.") from erro
     
+    # isistance = verifica se o objeto é de uma classe #
+    if not isinstance(body,dict) or not isinstance(body.get("data"), dict): 
+        raise ValueError("A API retornou dados em um formato inesperado.")
+
+    
+    patentes = body["data"].get("results")
+
+    if not isinstance(patentes, list) or any(
+        not isinstance(item, dict) for item in patentes
+    ):
+        raise ValueError("A lista de patentes retornada é invalida.")
+
     return patentes

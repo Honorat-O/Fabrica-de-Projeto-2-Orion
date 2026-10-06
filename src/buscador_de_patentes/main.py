@@ -1,5 +1,6 @@
 import streamlit as st
 from api import getPatentes
+import requests
 
 itens = 10;
 itens_por_pagina = 10;
@@ -14,23 +15,63 @@ def main():
             patente = st.text_input("Patente", type="search", placeholder="Insira uma patente aqui", label_visibility="collapsed")
             enviado = st.form_submit_button("Buscar")      
     
-    if enviado and patente:
-        # Parametros do getPatentes(texto do input, quantidade total de patentes para serem buscadas)
-        patentes = getPatentes(patente, itens)
+    if not enviado:
+        return
+    
+    termo = patente.strip()
 
-        if not patentes:
-            st.write("Nenhuma patente foi encontrada.")
+    if not termo:
+        st.warning("Digite um termo para pesquisar.")
+        return
+
+    try:
+        with st.spinner("Buscando patentes..."):
+            patentes = getPatentes(termo,itens)
+
+    except requests.exceptions.Timeout:
+        st.error("A busca demorou demais. Tente novamente.")
+        return
+
+    except requests.exceptions.ConnectionError:
+        st.error("Não foi possível conectar ao serviço de patentes. "
+                 "Verifiquei sua conexão e tente novamente."
+        )
+        return
+
+    except requests.exceptions.HTTPError as erro:
+        status = (
+            erro.response.status_code
+            if erro.response is not None
+            else None
+        )
+
+        if status == 401:
+            st.error("A autenticação falhou. Verifique a chave da API.")
+        elif status == 403:
+            st.error("O serviço recusou o acesso. Verifique as permissões.")
+        elif status == 429:
+            st.error(
+                "O limite de consultas foi atingido. "
+                "Aguarde um pouco antes de tentar novamente."
+            )
         else:
-            # Container de cards de patente
-            with st.container():
-                for patente in patentes[:itens_por_pagina]:
-                    with st.container(horizontal_alignment="center", border=True):
-                        st.write(f"{patente.get("title", "Título não informado")}")
-                        st.write(f"{patente.get("pn", "PN não informado")}")
-                        st.write(f"{patente.get("current_assignee", "Não informado")}")
+            st.error("O serviço não conseguiu concluir a busca.")
 
-    elif enviado and not patente:
-        st.write("Você precisa inserir alguma coisa na caixa de texto para buscar patentes")
+        return
 
-if __name__ == "__main__": 
+    except requests.exceptions.RequestException:
+        st.error("Ocorreu uma falha na comunicação com o serviço.")
+        return
+
+    except ValueError as erro:
+        st.error(str(erro))
+        return
+
+    for resultado in patentes[:itens_por_pagina]:
+        with st.container(horizontal_alignment="center", border=True):
+            st.write(resultado.get("title", "Título não informado."))
+            st.write(resultado.get("pn", "PN não informado."))
+            st.write(resultado.get("current_assignee", "Não informado."))
+
+if __name__ == "__main__":
     main()
