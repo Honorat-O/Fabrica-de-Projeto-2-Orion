@@ -1,3 +1,0 @@
-sk-3Mcb6yuwcBYPA6oG5afGH95ff5LmRiUOOcDJi66L7MSTbQ0a
-
-python -m streamlit run main.py
