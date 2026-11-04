@@ -10,6 +10,9 @@ def main():
     if "termo" not in st.session_state:
         st.session_state.termo = ""
 
+    if "pagina_atual" not in st.session_state:
+        st.session_state.pagina_atual = 1
+        
     # Container de Busca
     with st.container(horizontal=True, horizontal_alignment="center"):
         st.title("Busque sua patente aqui:")
@@ -25,6 +28,7 @@ def main():
             return
 
         st.session_state.termo = termo
+        st.session_state.pagina_atual = 1
 
     termo = st.session_state.termo
 
@@ -32,8 +36,7 @@ def main():
         return
 
     paginas = math.ceil(TOTAL_ITENS / ITENS_POR_PAGINA)
-    pagina_atual = st.pagination(paginas)
-    offset = (pagina_atual - 1) * ITENS_POR_PAGINA
+    offset = (st.session_state.pagina_atual - 1) * ITENS_POR_PAGINA
 
     try:
         with st.spinner("Buscando patentes..."):
@@ -83,6 +86,8 @@ def main():
             st.write(resultado.get("title", "Título não informado."))
             st.write(resultado.get("pn", "PN não informado."))
             st.write(resultado.get("current_assignee", "Não informado."))
+
+    pagina_atual = st.pagination(paginas, key="pagina_atual")
 
 if __name__ == "__main__":
     main()
