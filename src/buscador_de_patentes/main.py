@@ -1,13 +1,15 @@
 import streamlit as st
 from api import getPatentes
 import requests
+import math
 
-itens = 10;
-itens_por_pagina = 10;
-maximo_paginas_visiveis = 5;
-paginas = itens // itens_por_pagina;
+TOTAL_ITENS = 1000
+ITENS_POR_PAGINA = 10
 
 def main():
+    if "termo" not in st.session_state:
+        st.session_state.termo = ""
+
     # Container de Busca
     with st.container(horizontal=True, horizontal_alignment="center"):
         st.title("Busque sua patente aqui:")
@@ -15,18 +17,27 @@ def main():
             patente = st.text_input("Patente", type="search", placeholder="Insira uma patente aqui", label_visibility="collapsed")
             enviado = st.form_submit_button("Buscar")      
     
-    if not enviado:
-        return
-    
-    termo = patente.strip()
+    if enviado:
+        termo = patente.strip()
+
+        if not termo:
+            st.warning("Digite um termo para pesquisar.")
+            return
+
+        st.session_state.termo = termo
+
+    termo = st.session_state.termo
 
     if not termo:
-        st.warning("Digite um termo para pesquisar.")
         return
+
+    paginas = math.ceil(TOTAL_ITENS / ITENS_POR_PAGINA)
+    pagina_atual = st.pagination(paginas)
+    offset = (pagina_atual - 1) * ITENS_POR_PAGINA
 
     try:
         with st.spinner("Buscando patentes..."):
-            patentes = getPatentes(termo,itens)
+            patentes = getPatentes(termo, ITENS_POR_PAGINA, offset)
 
     except requests.exceptions.Timeout:
         st.error("A busca demorou demais. Tente novamente.")
@@ -67,7 +78,7 @@ def main():
         st.error(str(erro))
         return
 
-    for resultado in patentes[:itens_por_pagina]:
+    for resultado in patentes:
         with st.container(horizontal_alignment="center", border=True):
             st.write(resultado.get("title", "Título não informado."))
             st.write(resultado.get("pn", "PN não informado."))
