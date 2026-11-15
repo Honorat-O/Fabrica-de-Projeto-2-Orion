@@ -1,10 +1,11 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 from api import getPatentes
 import requests
 import math
 
-TOTAL_ITENS = 1000
+MAXIMO_PATENTES = 1000
 ITENS_POR_PAGINA = 10
 
 def main():
@@ -36,13 +37,12 @@ def main():
     if not termo:
         return
 
-    paginas = math.ceil(TOTAL_ITENS / ITENS_POR_PAGINA)
     offset = (st.session_state.pagina_atual - 1) * ITENS_POR_PAGINA
 
     try:
         #aqui, enquanto a pesquisa carrega, aparece essa mensagem e a bolinha rodando
         with st.spinner("Buscando patentes..."):
-            patentes = getPatentes(termo, ITENS_POR_PAGINA, offset)
+            patentes, total_patentes = getPatentes(termo, ITENS_POR_PAGINA, offset)
 
     except requests.exceptions.Timeout:
         st.error("A busca demorou demais. Tente novamente.")
@@ -82,6 +82,9 @@ def main():
     except ValueError as erro:
         st.error(str(erro))
         return
+
+    total_patentes = min(total_patentes, MAXIMO_PATENTES)
+    paginas = math.ceil(total_patentes / ITENS_POR_PAGINA)
 
     #fiz aqui um expander para colocar os gráficos e ficar mais organizado
 
@@ -175,8 +178,6 @@ def main():
                 columns=["País", "Quantidade"]
             )
 
-            import plotly.express as px
-
             # Criando o mapa corrigido
             fig = px.choropleth(
                 df_paises,
@@ -220,7 +221,8 @@ def main():
                 #aqui eu apresentei o país que foi feita a patente
                 st.write(f"Authority: {patente.get("authority", "Não informado")}")
 
-    pagina_atual = st.pagination(paginas, key="pagina_atual")
+    if paginas > 0:
+        pagina_atual = st.pagination(paginas, key="pagina_atual")
 
 if __name__ == "__main__":
     main()

@@ -39,4 +39,9 @@ def getPatentes(patente, limit = 10, offset = 0):
     ):
         raise ValueError("A lista de patentes retornada é invalida.")
 
-    return patentes
+    total_patentes = body["data"].get("total_search_result_count")
+
+    if not isinstance(total_patentes, int):
+        raise ValueError("A quantidade total de patentes retornada é inválida.")
+
+    return patentes, total_patentes
