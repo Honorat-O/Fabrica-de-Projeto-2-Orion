@@ -4,34 +4,33 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-def getPatentes(patente, qtd_patentes):
+def getPatentes(patente, limit = 10, offset = 0):
     url = "https://connect.patsnap.com/search/patent/query-search-patent/v2"
     headers = {
         "Authorization": f"Bearer {os.getenv('API_KEY')}",
         "Content-Type": "application/json"
     }
     payload = {
-        "limit": qtd_patentes,
+        "limit": limit,
+        "offset": offset,
         "collapse_order": "LATEST",
         "collapse_by": "PBD",
         "collapse_type": "DOCDB",
         "query_text": f"TACD: {patente}"
     }
 
-    response = requests.post(url, json=payload, headers=headers,timeout=(5,30))
+    response = requests.post(url, json=payload, headers=headers, timeout=(5, 30))
     response.raise_for_status()
 
     try:
         body = response.json()
-        print(body)
         
     except ValueError as erro:
         raise ValueError("A API retornou uma resposta inválida.") from erro
     
     # isistance = verifica se o objeto é de uma classe #
-    if not isinstance(body,dict) or not isinstance(body.get("data"), dict): 
+    if not isinstance(body, dict) or not isinstance(body.get("data"), dict): 
         raise ValueError("A API retornou dados em um formato inesperado.")
-
     
     patentes = body["data"].get("results")
 
