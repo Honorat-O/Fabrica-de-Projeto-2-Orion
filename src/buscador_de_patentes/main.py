@@ -15,6 +15,9 @@ def main():
     if "pagina_atual" not in st.session_state:
         st.session_state.pagina_atual = 1
 
+    if "patentes" not in st.session_state:
+        st.session_state.patentes = None
+
     # Container de Busca
     with st.container(horizontal=True, horizontal_alignment="center"):
         st.title("Busque sua patente aqui:")
@@ -31,60 +34,64 @@ def main():
 
         st.session_state.termo = termo
         st.session_state.pagina_atual = 1
+        st.session_state.patentes = None
 
     termo = st.session_state.termo
 
     if not termo:
         return
 
-    offset = (st.session_state.pagina_atual - 1) * ITENS_POR_PAGINA
+    if st.session_state.patentes is None:
+        try:
+            #aqui, enquanto a pesquisa carrega, aparece essa mensagem e a bolinha rodando
+            with st.spinner("Buscando patentes..."):
+                patentes, total_patentes = getPatentes(termo, MAXIMO_PATENTES, 0)
 
-    try:
-        #aqui, enquanto a pesquisa carrega, aparece essa mensagem e a bolinha rodando
-        with st.spinner("Buscando patentes..."):
-            patentes, total_patentes = getPatentes(termo, ITENS_POR_PAGINA, offset)
+        except requests.exceptions.Timeout:
+            st.error("A busca demorou demais. Tente novamente.")
+            return
 
-    except requests.exceptions.Timeout:
-        st.error("A busca demorou demais. Tente novamente.")
-        return
-
-    except requests.exceptions.ConnectionError:
-        st.error("Não foi possível conectar ao serviço de patentes. "
-                 "Verifiquei sua conexão e tente novamente."
-        )
-        return
-
-    except requests.exceptions.HTTPError as erro:
-        status = (
-            erro.response.status_code
-            if erro.response is not None
-            else None
-        )
-
-        if status == 401:
-            st.error("A autenticação falhou. Verifique a chave da API.")
-        elif status == 403:
-            st.error("O serviço recusou o acesso. Verifique as permissões.")
-        elif status == 429:
-            st.error(
-                "O limite de consultas foi atingido. "
-                "Aguarde um pouco antes de tentar novamente."
+        except requests.exceptions.ConnectionError:
+            st.error("Não foi possível conectar ao serviço de patentes. "
+                     "Verifiquei sua conexão e tente novamente."
             )
-        else:
-            st.error("O serviço não conseguiu concluir a busca.")
+            return
 
-        return
+        except requests.exceptions.HTTPError as erro:
+            status = (
+                erro.response.status_code
+                if erro.response is not None
+                else None
+            )
 
-    except requests.exceptions.RequestException:
-        st.error("Ocorreu uma falha na comunicação com o serviço.")
-        return
+            if status == 401:
+                st.error("A autenticação falhou. Verifique a chave da API.")
+            elif status == 403:
+                st.error("O serviço recusou o acesso. Verifique as permissões.")
+            elif status == 429:
+                st.error(
+                    "O limite de consultas foi atingido. "
+                    "Aguarde um pouco antes de tentar novamente."
+                )
+            else:
+                st.error("O serviço não conseguiu concluir a busca.")
 
-    except ValueError as erro:
-        st.error(str(erro))
-        return
+            return
 
-    total_patentes = min(total_patentes, MAXIMO_PATENTES)
-    paginas = math.ceil(total_patentes / ITENS_POR_PAGINA)
+        except requests.exceptions.RequestException:
+            st.error("Ocorreu uma falha na comunicação com o serviço.")
+            return
+
+        except ValueError as erro:
+            st.error(str(erro))
+            return
+
+        st.session_state.patentes = patentes
+
+    patentes = st.session_state.patentes
+    paginas = math.ceil(len(patentes) / ITENS_POR_PAGINA)
+    offset = (st.session_state.pagina_atual - 1) * ITENS_POR_PAGINA
+    patentes_pagina = patentes[offset:offset + ITENS_POR_PAGINA]
 
     #fiz aqui um expander para colocar os gráficos e ficar mais organizado
 
@@ -200,7 +207,7 @@ def main():
 
     # Container de cards de patente
     with st.container():
-        for patente in patentes[:ITENS_POR_PAGINA]:
+        for patente in patentes_pagina:
             with st.container(horizontal_alignment="center", border=True):
                 titulo_patente = (f"{patente.get("title", "Título não informado")}")
                 #aqui com o st.markdown, da pra modificiar o texto com html, então deixei ele no formato de titulo
