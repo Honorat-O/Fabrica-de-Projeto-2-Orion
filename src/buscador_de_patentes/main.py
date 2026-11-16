@@ -1,12 +1,29 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from api import getPatentes
+from api import getPatentes, montarConsulta
 import requests
 import math
 
 MAXIMO_PATENTES = 1000
 ITENS_POR_PAGINA = 10
+
+TIPOS_PESQUISA = {
+    "Palavras-chave": "TACD",
+    "Título": "TTL",
+    "Resumo": "ABST",
+    "Reivindicações": "CLMS",
+    "Descrição": "DESC",
+    "Número da patente (ex: US11205304B2)": "PN",
+    "Número do pedido (ex: US17/521392)": "APNO",
+    "Ano de aplicação (ex: 2020 ou 2020-2025)": "APD",
+    "Ano de publicação (ex: 2020 ou 2020-2025)": "PBD",
+    "Classificação IPC (ex: H04L ou B60Q1/00)": "IPC",
+    "Classificação CPC (ex: A46B11/0055)": "CPC",
+    "Inventor": "IN",
+    "Titular / empresa": "AN",
+    "Pesquisa avançada (ex: TTL:robot AND APD:[2020 TO 2025])": "AVANCADA",
+}
 
 def main():
     if "termo" not in st.session_state:
@@ -22,7 +39,8 @@ def main():
     with st.container(horizontal=True, horizontal_alignment="center"):
         st.title("Busque sua patente aqui:")
         with st.form("form_busca_patente", border=False):
-            patente = st.text_input("Patente", type="search", placeholder="Insira uma patente aqui", label_visibility="collapsed")
+            tipo_pesquisa = st.selectbox("Tipo de pesquisa", list(TIPOS_PESQUISA.keys()), label_visibility="collapsed")
+            patente = st.text_input("Patente", type="search", placeholder="Insira o termo da pesquisa", label_visibility="collapsed")
             enviado = st.form_submit_button("Buscar")
 
     if enviado:
@@ -30,6 +48,12 @@ def main():
 
         if not termo:
             st.warning("Digite um termo para pesquisar.")
+            return
+
+        try:
+            termo = montarConsulta(TIPOS_PESQUISA[tipo_pesquisa], termo)
+        except ValueError as erro:
+            st.warning(str(erro))
             return
 
         st.session_state.termo = termo
@@ -89,7 +113,12 @@ def main():
         st.session_state.patentes = patentes
 
     patentes = st.session_state.patentes
-    paginas = math.ceil(len(patentes) / ITENS_POR_PAGINA)
+
+    if not patentes:
+        st.info("Nenhuma patente encontrada para esta pesquisa.")
+        return
+
+    paginas =math.ceil(len(patentes) / ITENS_POR_PAGINA)
     offset = (st.session_state.pagina_atual - 1) * ITENS_POR_PAGINA
     patentes_pagina = patentes[offset:offset + ITENS_POR_PAGINA]
 
