@@ -1,226 +1,234 @@
+import io
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 from api import getPatentes
-import requests
-import math
 
-TOTAL_ITENS = 1000
-ITENS_POR_PAGINA = 10
+
+
+itens = 30;
+itens_por_pagina = 30;
+maximo_paginas_visiveis = 5;
+paginas = itens // itens_por_pagina;
 
 def main():
-    if "termo" not in st.session_state:
-        st.session_state.termo = ""
-
-    if "pagina_atual" not in st.session_state:
-        st.session_state.pagina_atual = 1
-
     # Container de Busca
     with st.container(horizontal=True, horizontal_alignment="center"):
         st.title("Busque sua patente aqui:")
         with st.form("form_busca_patente", border=False):
             patente = st.text_input("Patente", type="search", placeholder="Insira uma patente aqui", label_visibility="collapsed")
-            enviado = st.form_submit_button("Buscar")
-
-    if enviado:
-        termo = patente.strip()
-
-        if not termo:
-            st.warning("Digite um termo para pesquisar.")
-            return
-
-        st.session_state.termo = termo
-        st.session_state.pagina_atual = 1
-
-    termo = st.session_state.termo
-
-    if not termo:
-        return
-
-    paginas = math.ceil(TOTAL_ITENS / ITENS_POR_PAGINA)
-    offset = (st.session_state.pagina_atual - 1) * ITENS_POR_PAGINA
-
-    try:
+            enviado = st.form_submit_button("Buscar")      
+    
+    if enviado and patente:
         #aqui, enquanto a pesquisa carrega, aparece essa mensagem e a bolinha rodando
-        with st.spinner("Buscando patentes..."):
-            patentes = getPatentes(termo, ITENS_POR_PAGINA, offset)
+        with st.spinner("Please, wait..."):
+        # Parametros do getPatentes(texto do input, quantidade total de patentes para serem buscadas)
+            patentes = getPatentes(patente, itens)
 
-    except requests.exceptions.Timeout:
-        st.error("A busca demorou demais. Tente novamente.")
-        return
+        #fiz aqui um expander para colocar os gráficos e ficar mais organizado
+        
+        with st.expander("Detalhes e gráficos", expanded=False):
+            st.subheader("Patentes")
 
-    except requests.exceptions.ConnectionError:
-        st.error("Não foi possível conectar ao serviço de patentes. "
-                 "Verifiquei sua conexão e tente novamente."
-        )
-        return
+            #essa contagem eu fiz para usar no grafico, ele foi feito com base nas datas de publicação
+            contagem_anos = {}
+            for p in patentes:
+                data = str(p.get("pbdt", ""))
+                if data and len(data) >=4:
+                    ano = data[0:4]
 
-    except requests.exceptions.HTTPError as erro:
-        status = (
-            erro.response.status_code
-            if erro.response is not None
-            else None
-        )
+                    if ano in contagem_anos:
+                        contagem_anos[ano] +=1
+                    else:
+                        contagem_anos[ano] = 1
 
-        if status == 401:
-            st.error("A autenticação falhou. Verifique a chave da API.")
-        elif status == 403:
-            st.error("O serviço recusou o acesso. Verifique as permissões.")
-        elif status == 429:
-            st.error(
-                "O limite de consultas foi atingido. "
-                "Aguarde um pouco antes de tentar novamente."
-            )
-        else:
-            st.error("O serviço não conseguiu concluir a busca.")
+            #aqui, após fazer a contagem de quantas pesquisas tem em cada ano, eu coloco os dados no grafico (st.line_chart)
+            #dei uma leve alterada pra quando passar o mouse por cima do gráfico aparecer "Ano" e "Quantidade", isso foi mais chato do que eu achei que seria
+            if contagem_anos:
+                st.subheader("Quantidade de patentes por ano")
+                
+                df_anos = pd.DataFrame({
+                "Quantidade": contagem_anos
+                }).rename_axis("Ano").reset_index()
 
-        return
+                st.line_chart(
+                    df_anos,
+                    x="Ano",
+                    y="Quantidade"
+                )
+            
+            #agora aqui eu fiz um gráfico de empresas com mais patentes
+            #primeiro eu fiz uma contagem de quanto cada empresa tem de patentes do tema
 
-    except requests.exceptions.RequestException:
-        st.error("Ocorreu uma falha na comunicação com o serviço.")
-        return
+            contagem_empresas = {}
+            for p in patentes:
+                empresa = p.get("current_assignee", "Não informado")
 
-    except ValueError as erro:
-        st.error(str(erro))
-        return
+                if empresa and empresa != "Não informado":
+                    contagem_empresas[empresa] = (
+                        contagem_empresas.get(empresa, 0) + 1
+                    ) 
+            
+            #agora faço o grafico com o st.bar_chart
+            #quando tirarmos a limitação de pesquisa, da pra fazer algo como só aparecer as 20 que mais tem ou algo do tipo
+                
+            if contagem_empresas:
 
-    #fiz aqui um expander para colocar os gráficos e ficar mais organizado
+                df_empresas = pd.DataFrame(
+                    list(contagem_empresas.items()),
+                    columns = ["Empresa", "Quantidade"]
+                )
+                df_empresas = df_empresas.sort_values(
+                    "Quantidade", ascending=False
+                ).head(30)
 
-    with st.expander("Detalhes e gráficos", expanded=False):
-        st.subheader("Patentes")
-
-        #essa contagem eu fiz para usar no grafico, ele foi feito com base nas datas de publicação
-        contagem_anos = {}
-        for p in patentes:
-            data = str(p.get("pbdt", ""))
-            if data and len(data) >=4:
-                ano = data[0:4]
-
-                if ano in contagem_anos:
-                    contagem_anos[ano] +=1
-                else:
-                    contagem_anos[ano] = 1
-
-        #aqui, após fazer a contagem de quantas pesquisas tem em cada ano, eu coloco os dados no grafico (st.line_chart)
-        #dei uma leve alterada pra quando passar o mouse por cima do gráfico aparecer "Ano" e "Quantidade", isso foi mais chato do que eu achei que seria
-        if contagem_anos:
-            st.subheader("Quantidade de patentes por ano")
-
-            df_anos = pd.DataFrame({
-            "Quantidade": contagem_anos
-            }).rename_axis("Ano").reset_index()
-
-            st.line_chart(
-                df_anos,
-                x="Ano",
-                y="Quantidade"
-            )
-
-        #agora aqui eu fiz um gráfico de empresas com mais patentes
-        #primeiro eu fiz uma contagem de quanto cada empresa tem de patentes do tema
-
-        contagem_empresas = {}
-        for p in patentes:
-            empresa = p.get("current_assignee", "Não informado")
-
-            if empresa and empresa != "Não informado":
-                contagem_empresas[empresa] = (
-                    contagem_empresas.get(empresa, 0) + 1
+                st.subheader("Principais titulares de patentes")
+                fig_empresas = px.bar(
+                    df_empresas,
+                    x="Empresa",
+                    y="Quantidade"
                 )
 
-        #agora faço o grafico com o st.bar_chart
-        #quando tirarmos a limitação de pesquisa, da pra fazer algo como só aparecer as 20 que mais tem ou algo do tipo
+                st.plotly_chart(fig_empresas, use_container_width=True)
+            # --- COLOQUE ESTE TRECHO DENTRO DO SEU EXPANDER ---
 
-        if contagem_empresas:
-            df_empresas = pd.DataFrame(
-                list(contagem_empresas.items()),
-                columns = ["Depositante", "Quantidade"]
-            )
-            df_empresas = df_empresas.sort_values(
-                "Quantidade", ascending=False
-            )
+            st.subheader("Distribuição Global de Patentes")
 
-            st.subheader("Principais titulares de patentes")
-            st.bar_chart(
-            df_empresas,
-            x="Depositante",
-            y="Quantidade"
-            )
+            # Dicionário de conversão de Sigla ISO-2 para Nome em Inglês (aceito pelo Plotly)
+            mapa_paises = {
+                "BR": "Brazil", "US": "United States", "CN": "China", "JP": "Japan", 
+                "KR": "South Korea", "DE": "Germany", "FR": "France", "GB": "United Kingdom",
+                "CA": "Canada", "AU": "Australia", "IN": "India", "RU": "Russia",
+                "IT": "Italy", "ES": "Spain", "CH": "Switzerland", "NL": "Netherlands",
+                "SE": "Sweden", "FI": "Finland", "NO": "Norway", "DK": "Denmark"
+            }
 
+            contagem_paises = {}
+            for p in patentes:
+                sigla = p.get("authority", "Não informado")
+                if sigla and sigla != "Não informado":
+                    # Traduz a sigla para o nome do país. Se não estiver no dicionário, mantém a sigla
+                    nome_pais = mapa_paises.get(sigla, sigla)
+                    contagem_paises[nome_pais] = contagem_paises.get(nome_pais, 0) + 1
 
-        # --- COLOQUE ESTE TRECHO DENTRO DO SEU EXPANDER ---
-
-        st.subheader("Distribuição Global de Patentes")
-
-        # Dicionário de conversão de Sigla ISO-2 para Nome em Inglês (aceito pelo Plotly)
-        mapa_paises = {
-            "BR": "Brazil", "US": "United States", "CN": "China", "JP": "Japan",
-            "KR": "South Korea", "DE": "Germany", "FR": "France", "GB": "United Kingdom",
-            "CA": "Canada", "AU": "Australia", "IN": "India", "RU": "Russia",
-            "IT": "Italy", "ES": "Spain", "CH": "Switzerland", "NL": "Netherlands",
-            "SE": "Sweden", "FI": "Finland", "NO": "Norway", "DK": "Denmark"
-        }
-
-        contagem_paises = {}
-        for p in patentes:
-            sigla = p.get("authority", "Não informado")
-            if sigla and sigla != "Não informado":
-                # Traduz a sigla para o nome do país. Se não estiver no dicionário, mantém a sigla
-                nome_pais = mapa_paises.get(sigla, sigla)
-                contagem_paises[nome_pais] = contagem_paises.get(nome_pais, 0) + 1
-
-        if contagem_paises:
-            # Criamos o DataFrame com os nomes convertidos
-            df_paises = pd.DataFrame(
-                list(contagem_paises.items()),
-                columns=["País", "Quantidade"]
-            )
-
-            import plotly.express as px
-
-            # Criando o mapa corrigido
-            fig = px.choropleth(
-                df_paises,
-                locations="País",
-                locationmode="country names",  # Mudamos para 'country names' que é aceito pelo Plotly
-                color="Quantidade",
-                hover_name="País",
-                color_continuous_scale=px.colors.sequential.Plasma,
-                title="Volume de Patentes por País de Origem (Authority)"
-            )
-
-            fig.update_layout(
-                margin={"r":0,"t":40,"l":0,"b":0},
-                geo=dict(showframe=False, showcoastlines=True)
-            )
-
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.write("Dados de geolocalização não disponíveis para estas patentes.")
-
-    # Container de cards de patente
-    with st.container():
-        for patente in patentes[:ITENS_POR_PAGINA]:
-            with st.container(horizontal_alignment="center", border=True):
-                titulo_patente = (f"{patente.get("title", "Título não informado")}")
-                #aqui com o st.markdown, da pra modificiar o texto com html, então deixei ele no formato de titulo
-                st.markdown(
-                    f"<h2 style = 'font-size: 28px; font-weight: bold; '>{titulo_patente}</h2>",
-                    unsafe_allow_html=True
+            if contagem_paises:
+                # Criamos o DataFrame com os nomes convertidos
+                df_paises = pd.DataFrame(
+                    list(contagem_paises.items()), 
+                    columns=["País", "Quantidade"]
                 )
-                st.write(f"SN: {patente.get("pn", "PN não informado")}")
-                st.write(f"Autors: {patente.get("current_assignee", "Não informado")}")
-                #aqui, como a data tava como YYYYMMDD, eu transformei ela em string e formatei ela pra colocar no padrão brasileiro e apresentar no front
-                def formatar_data(data):
-                    if not data:
-                        return "Data não informada"
-                    data = str(data)
-                    return f"{data[6:8]}/{data[4:6]}/{data[0:4]}"
-                data_publicacao = formatar_data(patente.get("pbdt"))
-                st.write(f"Date: {data_publicacao}")
-                #aqui eu apresentei o país que foi feita a patente
-                st.write(f"Authority: {patente.get("authority", "Não informado")}")
+                
+                # Criando o mapa corrigido
+                fig = px.choropleth(
+                    df_paises,
+                    locations="País",
+                    locationmode="country names",  # Mudamos para 'country names' que é aceito pelo Plotly
+                    color="Quantidade",
+                    hover_name="País",
+                    color_continuous_scale=px.colors.sequential.Plasma,
+                    title="Volume de Patentes por País de Origem (Authority)"
+                )
+                
+                fig.update_layout(
+                    margin={"r":0,"t":40,"l":0,"b":0},
+                    geo=dict(showframe=False, showcoastlines=True)
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.write("Dados de geolocalização não disponíveis para estas patentes.")
+            
+            st.divider()
+            st.subheader("Exportar dados dos gráficos")
 
-    pagina_atual = st.pagination(paginas, key="pagina_atual")
+            #agora aqui eu vou criar os graficos em forma de texto para baixar
 
-if __name__ == "__main__":
+            texto_relatorio = f"RELATÓRIO DAS PATENTES - BUSCA: {patente.upper()}\n"
+            texto_relatorio += "="*50 +  "\n\n"
+            
+
+            if contagem_anos:
+                texto_relatorio += "PATENTES POR ANO\n"
+                texto_relatorio += df_anos.to_string(index=False) + "\n\n"
+            
+            if contagem_empresas:
+                texto_relatorio += "30 EMPRESAS COM MAIS PATENTES\n"
+                texto_relatorio += df_empresas.to_string(index=False) + "\n\n"
+            
+            if contagem_paises:
+                texto_relatorio += "DISTRIBUIÇÃO POR PAÍS\n"
+                texto_relatorio += df_paises.to_string(index=False) + "\n\n"
+            
+        
+        #agora vou criar a tabela excel dos graficos para baixar
+
+        buffer_excel = io.BytesIO()
+
+        with pd.ExcelWriter(buffer_excel, engine="openpyxl") as writer:
+            #pelo q vi isso de cima é pra sair no formato moderno do excel
+            #agora vou passar os dados do grafico pro formato excel
+            if contagem_anos:
+                df_anos.to_excel(writer, sheet_name="Por ano", index=False)
+
+            if contagem_empresas:
+                df_empresas.to_excel(writer, sheet_name="30 EMPRESAS COM MAIS PATENTES", index=-False)
+
+            if contagem_paises:
+                df_paises.to_excel(writer, sheet_name="Por país", index=False)
+
+        
+        #agora vou crioar os botoes de download
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.download_button(
+                label = "Baixar dados em TXT",
+                data=texto_relatorio,
+                file_name=f"relatorio_{patente}.txt",
+                mime="text/plain",
+                use_container_width=True
+            )
+
+        with col2:
+            st.download_button(
+                label = "Baixar planilha Excel",
+                data=buffer_excel.getvalue(),
+                file_name=f"relatorio_{patente}.xlsx",
+                #pelo q eu vi agr isso é pra avisar q o arquivo é em formato do excel
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
+
+
+        if not patentes:
+            st.write("Nenhuma patente foi encontrada.")
+        else:
+            # Container de cards de patente
+            with st.container():
+                for patente in patentes[:itens_por_pagina]:
+                    with st.container(horizontal_alignment="center", border=True):
+                        titulo_patente = (f"{patente.get("title", "Título não informado")}")
+                        #aqui com o st.markdown, da pra modificiar o texto com html, então deixei ele no formato de titulo
+                        st.markdown(
+                            f"<h2 style = 'font-size: 28px; font-weight: bold; '>{titulo_patente}</h2>",
+                            unsafe_allow_html=True
+                        )
+                        st.write(f"SN: {patente.get("pn", "PN não informado")}")
+                        st.write(f"Autors: {patente.get("current_assignee", "Não informado")}")
+                        #aqui, como a data tava como YYYYMMDD, eu transformei ela em string e formatei ela pra colocar no padrão brasileiro e apresentar no front
+                        def formatar_data(data):
+                            if not data:
+                                return "Data não informada"
+                            data = str(data)
+                            return f"{data[6:8]}/{data[4:6]}/{data[0:4]}"
+                        data_publicacao = formatar_data(patente.get("pbdt"))
+                        st.write(f"Date: {data_publicacao}")
+                        #aqui eu apresentei o país que foi feita a patente
+                        st.write(f"Authority: {patente.get("authority", "Não informado")}")
+
+    elif enviado and not patente:
+        st.write("Você precisa inserir alguma coisa na caixa de texto para buscar patentes")
+
+if __name__ == "__main__": 
     main()
