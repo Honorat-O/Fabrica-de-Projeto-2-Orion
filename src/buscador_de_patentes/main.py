@@ -1,3 +1,4 @@
+import io
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -33,7 +34,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-MAXIMO_PATENTES = 1000
+MAXIMO_PATENTES = 100
 ITENS_POR_PAGINA = 10
 
 TIPOS_PESQUISA = {
@@ -431,22 +432,40 @@ def main():
         #agora faço o grafico com o st.bar_chart
         #quando tirarmos a limitação de pesquisa, da pra fazer algo como só aparecer as 20 que mais tem ou algo do tipo
 
+
+        #agora aqui eu fiz um gráfico de empresas com mais patentes
+        #primeiro eu fiz uma contagem de quanto cada empresa tem de patentes do tema
+
+        contagem_empresas = {}
+        for p in patentes:
+            empresa = p.get("current_assignee", "Não informado")
+
+            if empresa and empresa != "Não informado":
+                contagem_empresas[empresa] = (
+                    contagem_empresas.get(empresa, 0) + 1
+                )
+
+        #agora faço o grafico com o st.bar_chart
+        #quando tirarmos a limitação de pesquisa, da pra fazer algo como só aparecer as 20 que mais tem ou algo do tipo
+
         if contagem_empresas:
+
             df_empresas = pd.DataFrame(
                 list(contagem_empresas.items()),
-                columns = ["Depositante", "Quantidade"]
+                columns = ["Empresa", "Quantidade"]
             )
             df_empresas = df_empresas.sort_values(
                 "Quantidade", ascending=False
-            )
+            ).head(20)
 
             st.subheader("Principais titulares de patentes")
-            st.bar_chart(
-            df_empresas,
-            x="Depositante",
-            y="Quantidade"
+            fig_empresas = px.bar(
+                df_empresas,
+                x="Empresa",
+                y="Quantidade"
             )
 
+            st.plotly_chart(fig_empresas, use_container_width=True)
 
         # --- COLOQUE ESTE TRECHO DENTRO DO SEU EXPANDER ---
 
@@ -495,6 +514,66 @@ def main():
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.write("Dados de geolocalização não disponíveis para estas patentes.")
+
+        st.divider()
+        st.subheader("Exportar dados dos gráficos")
+
+        #agora aqui eu vou criar os graficos em forma de texto para baixar
+
+        texto_relatorio = f"RELATÓRIO DAS PATENTES - BUSCA: {patente.upper()}\n"
+        texto_relatorio += "=" * 50 + "\n\n"
+
+        if contagem_anos:
+            texto_relatorio += "PATENTES POR ANO\n"
+            texto_relatorio += df_anos.to_string(index=False) + "\n\n"
+
+        if contagem_empresas:
+            texto_relatorio += "20 EMPRESAS COM MAIS PATENTES\n"
+            texto_relatorio += df_empresas.to_string(index=False) + "\n\n"
+
+        if contagem_paises:
+            texto_relatorio += "DISTRIBUIÇÃO POR PAÍS\n"
+            texto_relatorio += df_paises.to_string(index=False) + "\n\n"
+
+        #agora vou criar a tabela excel dos graficos para baixar
+
+        buffer_excel = io.BytesIO()
+
+        with pd.ExcelWriter(buffer_excel, engine="openpyxl") as writer:
+            #pelo q vi isso de cima é pra sair no formato moderno do excel
+            #agora vou passar os dados do grafico pro formato excel
+
+            if contagem_anos:
+                df_anos.to_excel(writer, sheet_name="Patentes por ano", index=False)
+
+            if contagem_empresas:
+                df_empresas.to_excel(writer, sheet_name="Empresas com mais patentes", index=False)
+
+            if contagem_paises:
+                df_paises.to_excel(writer, sheet_name="Patentes por país", index=False)
+
+        #agora vou crioar os botoes de download
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.download_button(
+                label = "Baixar dados em TXT",
+                data=texto_relatorio,
+                file_name=f"relatorio_{patente}.txt",
+                mime="text/plain",
+                use_container_width=True
+            )
+
+        with col2:
+            st.download_button(
+                label = "Baixar planilha Excel",
+                data=buffer_excel.getvalue(),
+                file_name=f"relatorio_{patente}.xlsx",
+                #pelo q eu vi agr isso é pra avisar q o arquivo é em formato do excel
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
 
     # Exibe os cards salvos na sessão
     for i, resultado in enumerate(patentes_pagina):
