@@ -1,9 +1,10 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from api import getPatentes, montarConsulta
+from api import getPatentes, montarConsulta, montarFiltros, aplicarFiltros
 import requests
 import math
+from datetime import date
 from componentes import mostrar_card, mostrar_detalhes
 
 st.set_page_config(
@@ -17,6 +18,15 @@ st.markdown(
     @import url('https://fonts.cdnfonts.com/css/sf-pro-display');
     html, body, [class*="css"], [data-testid="stAppViewContainer"] * {
         font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'San Francisco', sans-serif !important;
+    }
+    /* os ícones do Streamlit são texto (ex: "keyboard_arrow_right") desenhado pela fonte Material Symbols,
+       então eles precisam voltar para essa fonte, senão aparecem escritos na tela */
+    [data-testid="stIconMaterial"],
+    [data-testid="stAlertDynamicIcon"],
+    [data-testid="stToastDynamicIcon"],
+    [data-testid="stHeadingIcon"],
+    [data-testid="stMetricIcon"] {
+        font-family: 'Material Symbols Rounded' !important;
     }
     </style>
     """,
@@ -43,10 +53,199 @@ TIPOS_PESQUISA = {
     "Pesquisa avançada (ex: TTL:robot AND APD:[2020 TO 2025])": "AVANCADA",
 }
 
+# autoridades (escritórios de patentes) usadas no filtro AUTHORITY
+AUTORIDADES = {
+    "US": "Estados Unidos",
+    "EP": "Europa (EPO)",
+    "WO": "Internacional (WIPO/PCT)",
+    "CN": "China",
+    "JP": "Japão",
+    "KR": "Coreia do Sul",
+    "BR": "Brasil",
+    "DE": "Alemanha",
+    "GB": "Reino Unido",
+    "FR": "França",
+    "CA": "Canadá",
+    "AU": "Austrália",
+    "IN": "Índia",
+    "RU": "Rússia",
+}
+
+# nomes que aparecem nos filtros aplicados, a chave é o field code da PatSnap
+NOMES_FILTROS = {
+    "PBD": "Publicação",
+    "APD": "Aplicação",
+    "AUTHORITY": "Autoridade",
+    "IPC": "IPC",
+    "CPC": "CPC",
+    "IN": "Inventor",
+    "AN": "Titular",
+}
+
+DATA_MINIMA = date(1800, 1, 1)
+
+# troca os filtros aplicados e refaz a pesquisa a partir da primeira página
+def trocarFiltros(filtros):
+    st.session_state.filtros = filtros
+    # mudar a versão recria os campos da barra lateral com os filtros aplicados (ou vazios ao limpar)
+    st.session_state.versao_filtros += 1
+    st.session_state.pagina_atual = 1
+    st.session_state.patentes = None
+    st.rerun()
+
+# dois campos de data (De / Até) para os filtros de período
+def campoPeriodo(campo, versao):
+    inicio, fim = st.session_state.filtros.get(campo, (None, None))
+    coluna_inicio, coluna_fim = st.columns(2)
+
+    with coluna_inicio:
+        inicio = st.date_input(
+            "De",
+            value=inicio,
+            min_value=DATA_MINIMA,
+            max_value=date.today(),
+            format="DD/MM/YYYY",
+            key=f"{campo}_inicio_{versao}",
+        )
+
+    with coluna_fim:
+        fim = st.date_input(
+            "Até",
+            value=fim,
+            min_value=DATA_MINIMA,
+            max_value=date.today(),
+            format="DD/MM/YYYY",
+            key=f"{campo}_fim_{versao}",
+        )
+
+    return inicio, fim
+
+# barra lateral com os filtros, eles só são aplicados quando o usuário clica em "Aplicar"
+def mostrarFiltros():
+    filtros = st.session_state.filtros
+    versao = st.session_state.versao_filtros
+
+    with st.sidebar:
+        st.header("Filtros")
+
+        with st.form("form_filtros", border=False):
+            with st.expander("Período", expanded="PBD" in filtros or "APD" in filtros):
+                st.caption("Data de publicação")
+                pbd_inicio, pbd_fim = campoPeriodo("PBD", versao)
+
+                st.caption("Data de aplicação")
+                apd_inicio, apd_fim = campoPeriodo("APD", versao)
+
+            with st.expander("Autoridade", expanded="AUTHORITY" in filtros):
+                autoridades = st.multiselect(
+                    "Autoridade",
+                    list(AUTORIDADES.keys()),
+                    default=filtros.get("AUTHORITY", []),
+                    format_func=lambda sigla: f"{sigla} - {AUTORIDADES[sigla]}",
+                    placeholder="Selecione uma ou mais",
+                    label_visibility="collapsed",
+                    key=f"AUTHORITY_{versao}",
+                )
+
+            with st.expander("Classificação", expanded="IPC" in filtros or "CPC" in filtros):
+                ipc = st.text_input("IPC", value=filtros.get("IPC", ""), placeholder="ex: H04L; G06N3/08", key=f"IPC_{versao}")
+                cpc = st.text_input("CPC", value=filtros.get("CPC", ""), placeholder="ex: G06N3/08", key=f"CPC_{versao}")
+
+            with st.expander("Inventor e titular", expanded="IN" in filtros or "AN" in filtros):
+                inventor = st.text_input("Inventor", value=filtros.get("IN", ""), placeholder="ex: Hinton; LeCun", key=f"IN_{versao}")
+                titular = st.text_input("Titular / empresa", value=filtros.get("AN", ""), placeholder="ex: Qualcomm; Samsung", key=f"AN_{versao}")
+
+            st.caption("Para informar mais de um valor, separe com ponto e vírgula (;).")
+
+            coluna_aplicar, coluna_limpar = st.columns(2)
+
+            with coluna_aplicar:
+                aplicar = st.form_submit_button("Aplicar", width="stretch")
+
+            with coluna_limpar:
+                limpar = st.form_submit_button("Limpar", width="stretch")
+
+    if limpar:
+        trocarFiltros({})
+
+    if aplicar:
+        # só entram os filtros que foram preenchidos
+        novos_filtros = {}
+
+        if pbd_inicio or pbd_fim:
+            novos_filtros["PBD"] = (pbd_inicio, pbd_fim)
+
+        if apd_inicio or apd_fim:
+            novos_filtros["APD"] = (apd_inicio, apd_fim)
+
+        if autoridades:
+            novos_filtros["AUTHORITY"] = autoridades
+
+        for campo, valor in (("IPC", ipc), ("CPC", cpc), ("IN", inventor), ("AN", titular)):
+            if valor.strip(" ;"):
+                novos_filtros[campo] = valor.strip(" ;")
+
+        try:
+            montarFiltros(novos_filtros)
+        except ValueError as erro:
+            st.sidebar.warning(str(erro))
+            return
+
+        if novos_filtros != filtros:
+            trocarFiltros(novos_filtros)
+
+# texto curto de cada filtro aplicado, ex: "01/01/2020 a 31/12/2025"
+def descreverFiltro(campo, valor):
+    if campo in ("APD", "PBD"):
+        inicio, fim = valor
+
+        if inicio and fim:
+            return f"{inicio:%d/%m/%Y} a {fim:%d/%m/%Y}"
+
+        if inicio:
+            return f"a partir de {inicio:%d/%m/%Y}"
+
+        return f"até {fim:%d/%m/%Y}"
+
+    if campo == "AUTHORITY":
+        return ", ".join(valor)
+
+    return valor
+
+# mostra os filtros aplicados acima dos resultados, clicar em um deles remove o filtro
+def mostrarFiltrosAplicados():
+    filtros = st.session_state.filtros
+
+    if not filtros:
+        return
+
+    with st.container(horizontal=True, vertical_alignment="center"):
+        st.caption("Filtros aplicados:")
+
+        for campo, valor in filtros.items():
+            if st.button(
+                f"{NOMES_FILTROS[campo]}: {descreverFiltro(campo, valor)}",
+                key=f"remover_filtro_{campo}",
+                icon=":material/close:",
+                help="Remover filtro",
+            ):
+                novos_filtros = dict(filtros)
+                del novos_filtros[campo]
+                trocarFiltros(novos_filtros)
+
 def main():
     # Inicializa os estados na memória da sessão
     if "termo" not in st.session_state:
         st.session_state.termo = ""
+
+    if "filtros" not in st.session_state:
+        st.session_state.filtros = {}
+
+    if "versao_filtros" not in st.session_state:
+        st.session_state.versao_filtros = 0
+
+    if "total_patentes" not in st.session_state:
+        st.session_state.total_patentes = 0
 
     if "pagina_atual" not in st.session_state:
         st.session_state.pagina_atual = 1
@@ -66,6 +265,8 @@ def main():
     st.title("🔎 Searchent")
     st.caption("Explore patentes e encontre tecnologias para seus projetos.")
 
+    mostrarFiltros()
+
     with st.form("form_busca_patente", border=False):
         tipo_pesquisa = st.selectbox("Tipo de pesquisa", list(TIPOS_PESQUISA.keys()), label_visibility="collapsed")
 
@@ -84,6 +285,8 @@ def main():
                 "Buscar",
                 use_container_width=True,
             )
+
+    mostrarFiltrosAplicados()
 
     st.divider()
 
@@ -113,7 +316,9 @@ def main():
         try:
             #aqui, enquanto a pesquisa carrega, aparece essa mensagem e a bolinha rodando
             with st.spinner("Buscando patentes..."):
-                patentes, total_patentes = getPatentes(termo, MAXIMO_PATENTES, 0)
+                # os filtros entram na própria consulta, então resultados, paginação e gráficos usam a mesma pesquisa filtrada
+                consulta = aplicarFiltros(termo, st.session_state.filtros)
+                patentes, total_patentes = getPatentes(consulta, MAXIMO_PATENTES, 0)
 
         except requests.exceptions.Timeout:
             st.error("A busca demorou demais. Tente novamente.")
@@ -156,12 +361,24 @@ def main():
             return
 
         st.session_state.patentes = patentes
+        st.session_state.total_patentes = total_patentes
 
     patentes = st.session_state.patentes
 
     if not patentes:
-        st.info("Nenhuma patente encontrada para esta pesquisa.")
+        if st.session_state.filtros:
+            st.info("Nenhuma patente encontrada com os filtros aplicados.")
+        else:
+            st.info("Nenhuma patente encontrada para esta pesquisa.")
         return
+
+    # a API devolve o total geral, mas só as primeiras MAXIMO_PATENTES são carregadas
+    total_formatado = f"{st.session_state.total_patentes:,}".replace(",", ".")
+
+    if st.session_state.total_patentes > len(patentes):
+        st.caption(f"{total_formatado} patentes encontradas (exibindo as {len(patentes)} primeiras).")
+    else:
+        st.caption(f"{total_formatado} patentes encontradas.")
 
     paginas =math.ceil(len(patentes) / ITENS_POR_PAGINA)
     offset = (st.session_state.pagina_atual - 1) * ITENS_POR_PAGINA

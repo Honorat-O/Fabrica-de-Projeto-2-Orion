@@ -24,6 +24,49 @@ def montarConsulta(campo, termo):
 
     return f"{campo}:({termo})"
 
+# transforma os filtros da barra lateral em expressões do query_text
+# filtros = {"PBD": (inicio, fim), "AUTHORITY": ["US", "CN"], "IPC": "H04L; G06N", ...}
+def montarFiltros(filtros):
+    expressoes = []
+
+    for campo, valor in filtros.items():
+        # nas datas o início ou o fim podem ficar em branco, aí a PatSnap usa o "*"
+        if campo in ("APD", "PBD"):
+            inicio, fim = valor
+
+            if inicio and fim and inicio > fim:
+                raise ValueError("A data inicial não pode ser maior que a data final.")
+
+            inicio = inicio.strftime("%Y%m%d") if inicio else "*"
+            fim = fim.strftime("%Y%m%d") if fim else "*"
+            expressoes.append(f"{campo}:[{inicio} TO {fim}]")
+
+        elif campo == "AUTHORITY":
+            expressoes.append(f"AUTHORITY:({' OR '.join(valor)})")
+
+        # nos campos de texto o usuário separa vários valores com ";" (ex: Qualcomm; Samsung)
+        else:
+            itens = [f"({item.strip()})" for item in valor.split(";") if item.strip()]
+
+            if itens:
+                expressoes.append(f"{campo}:({' OR '.join(itens)})")
+
+    return expressoes
+
+# junta a consulta do usuário com os filtros, ex: (TACD:(robot)) AND AUTHORITY:(US OR CN)
+def aplicarFiltros(consulta, filtros):
+    expressoes = montarFiltros(filtros)
+
+    if not expressoes:
+        return consulta
+
+    consulta = " AND ".join([f"({consulta})"] + expressoes)
+
+    if len(consulta) > 3000:
+        raise ValueError("A consulta com os filtros passou do limite de 3.000 caracteres.")
+
+    return consulta
+
 def getPatentes(patente, limit = 10, offset = 0):
     url = "https://connect.patsnap.com/search/patent/query-search-patent/v2"
     headers = {
