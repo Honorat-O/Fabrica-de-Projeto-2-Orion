@@ -11,3 +11,6 @@ wheels/
 
 # Enviroment variables
 .env
+
+# Txt files
+*.txt
