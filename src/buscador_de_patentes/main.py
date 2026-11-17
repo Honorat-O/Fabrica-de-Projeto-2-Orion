@@ -4,6 +4,24 @@ import plotly.express as px
 from api import getPatentes, montarConsulta
 import requests
 import math
+from componentes import mostrar_card, mostrar_detalhes
+
+st.set_page_config(
+    page_title="Orion | Buscador de Patentes",
+    page_icon="🔎",
+    layout="wide",
+)
+st.markdown(
+    """
+    <style>
+    @import url('https://fonts.cdnfonts.com/css/sf-pro-display');
+    html, body, [class*="css"], [data-testid="stAppViewContainer"] * {
+        font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'San Francisco', sans-serif !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 MAXIMO_PATENTES = 1000
 ITENS_POR_PAGINA = 10
@@ -26,6 +44,7 @@ TIPOS_PESQUISA = {
 }
 
 def main():
+    # Inicializa os estados na memória da sessão
     if "termo" not in st.session_state:
         st.session_state.termo = ""
 
@@ -35,13 +54,38 @@ def main():
     if "patentes" not in st.session_state:
         st.session_state.patentes = None
 
-    # Container de Busca
-    with st.container(horizontal=True, horizontal_alignment="center"):
-        st.title("Busque sua patente aqui:")
-        with st.form("form_busca_patente", border=False):
-            tipo_pesquisa = st.selectbox("Tipo de pesquisa", list(TIPOS_PESQUISA.keys()), label_visibility="collapsed")
-            patente = st.text_input("Patente", type="search", placeholder="Insira o termo da pesquisa", label_visibility="collapsed")
-            enviado = st.form_submit_button("Buscar")
+    if "patente_selecionada" not in st.session_state:
+        st.session_state["patente_selecionada"] = None
+
+    # Se o usuário clicou em uma patente, mostra SÓ a área dela:
+    if st.session_state["patente_selecionada"] is not None:
+        mostrar_detalhes(st.session_state["patente_selecionada"])
+        return
+
+    # Caso contrário, mostra a tela normal de busca:
+    st.title("🔎 Searchent")
+    st.caption("Explore patentes e encontre tecnologias para seus projetos.")
+
+    with st.form("form_busca_patente", border=False):
+        tipo_pesquisa = st.selectbox("Tipo de pesquisa", list(TIPOS_PESQUISA.keys()), label_visibility="collapsed")
+
+        coluna_busca, coluna_botao = st.columns([5, 1])
+
+        with coluna_busca:
+            patente = st.text_input(
+                "Termo de busca",
+                type="search",
+                placeholder="Insira o termo da pesquisa",
+                label_visibility="collapsed",
+            )
+
+        with coluna_botao:
+            enviado = st.form_submit_button(
+                "Buscar",
+                use_container_width=True,
+            )
+
+    st.divider()
 
     if enviado:
         termo = patente.strip()
@@ -76,8 +120,9 @@ def main():
             return
 
         except requests.exceptions.ConnectionError:
-            st.error("Não foi possível conectar ao serviço de patentes. "
-                     "Verifiquei sua conexão e tente novamente."
+            st.error(
+                "Não foi possível conectar ao serviço de patentes. "
+                "Verifique sua conexão e tente novamente."
             )
             return
 
@@ -234,28 +279,9 @@ def main():
         else:
             st.write("Dados de geolocalização não disponíveis para estas patentes.")
 
-    # Container de cards de patente
-    with st.container():
-        for patente in patentes_pagina:
-            with st.container(horizontal_alignment="center", border=True):
-                titulo_patente = (f"{patente.get("title", "Título não informado")}")
-                #aqui com o st.markdown, da pra modificiar o texto com html, então deixei ele no formato de titulo
-                st.markdown(
-                    f"<h2 style = 'font-size: 28px; font-weight: bold; '>{titulo_patente}</h2>",
-                    unsafe_allow_html=True
-                )
-                st.write(f"SN: {patente.get("pn", "PN não informado")}")
-                st.write(f"Autors: {patente.get("current_assignee", "Não informado")}")
-                #aqui, como a data tava como YYYYMMDD, eu transformei ela em string e formatei ela pra colocar no padrão brasileiro e apresentar no front
-                def formatar_data(data):
-                    if not data:
-                        return "Data não informada"
-                    data = str(data)
-                    return f"{data[6:8]}/{data[4:6]}/{data[0:4]}"
-                data_publicacao = formatar_data(patente.get("pbdt"))
-                st.write(f"Date: {data_publicacao}")
-                #aqui eu apresentei o país que foi feita a patente
-                st.write(f"Authority: {patente.get("authority", "Não informado")}")
+    # Exibe os cards salvos na sessão
+    for i, resultado in enumerate(patentes_pagina):
+        mostrar_card(resultado, i)
 
     if paginas > 0:
         pagina_atual = st.pagination(paginas, key="pagina_atual")
