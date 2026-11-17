@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from api import getPatentes
+from api import getPatentes, getDetalhesPatente, getDescricaoPatente
 import requests
 import math
 
@@ -50,7 +50,7 @@ def main():
 
     except requests.exceptions.ConnectionError:
         st.error("Não foi possível conectar ao serviço de patentes. "
-                 "Verifiquei sua conexão e tente novamente."
+                 "Verifique sua conexão e tente novamente."
         )
         return
 
