@@ -30,10 +30,70 @@ def mostrar_card(patente, indice):
             st.session_state["patente_selecionada"] = patente
             st.rerun()
 
+        pn = patente.get("pn") or patente.get("publication_number")
+
+        # Garante que dicionário de patentes salvas existe (segurança extra)
+        if "patentes_salvas" not in st.session_state:
+            st.session_state.patentes_salvas = {}
+
+        # Verifica se patente já foi adicionada pelo seu "pn"
+        ja_adicionada = pn in st.session_state.patentes_salvas
+
+        # Cria botão com chave única, bloqueio e tooltip
+        if st.button(
+            "Adicionar Patente",
+            key=f"btn_add_card{indice}",
+            disabled=ja_adicionada,
+            help="Patente já adicionada" if ja_adicionada else None
+        ):
+            st.session_state.patentes_salvas[pn] = patente
+            st.rerun()
+        
+
+def montar_linha_planilha(patente, descricao):
+    numero_da_patente = patente.get("pn") or patente.get("publication_number")
+    titulo = patente.get("title")
+    titular = patente.get("current_assignee")
+    sigla_pais = patente.get("authority")
+
+    data_publicacao = patente.get("pbdt")
+    if data_publicacao and len(str(data_publicacao)) == 8:
+        data_api = str(data_publicacao)
+        data_publicacao = (f"{data_api[6:]}/{data_api[4:6]}/{data_api[:4]}")
+
+    patente_id = patente.get("patent_id")
+
+    resumo = descricao
+
+    dicionario = {"Número da patente": numero_da_patente,
+                  "Título": titulo,
+                  "Titular": titular,
+                  "País": sigla_pais,
+                  "Data de publicação": data_publicacao,
+                  "ID": patente_id,
+                  "Resumo": resumo}
+
+    return dicionario
 
 def mostrar_detalhes(patente):
     if st.button("⬅ Voltar para os resultados"):
         st.session_state["patente_selecionada"] = None
+        st.rerun()
+
+    pn = patente.get("pn") or patente.get("publication_number")
+
+    if "patentes_salvas" not in st.session_state:
+        st.session_state["patentes_salvas"] = {}
+
+    ja_adicionada = pn in st.session_state["patentes_salvas"]
+
+    if st.button(
+        "Adicionar Patente",
+        key=f"btn_add_detalhes_{pn}",
+        disabled=ja_adicionada,
+        help="Patente já adicionada" if ja_adicionada else None
+    ):
+        st.session_state["patentes_salvas"][pn] = patente
         st.rerun()
 
     st.divider()
@@ -78,7 +138,6 @@ def mostrar_detalhes(patente):
                 pn=patente.get("pn")
             )
             st.write(descricao or "Não informado.")
-
 
         with col_direita:
             st.caption("Figura da Patente:")

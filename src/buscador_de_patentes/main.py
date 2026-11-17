@@ -1,33 +1,89 @@
 import io
-import streamlit as st
-import pandas as pd
-import plotly.express as px
-from api import getPatentes, montarConsulta, montarFiltros, aplicarFiltros
-import requests
 import math
 from datetime import date
-from componentes import mostrar_card, mostrar_detalhes
 
+import pandas as pd
+import plotly.express as px
+import requests
+import streamlit as st
+
+from api import (
+    aplicarFiltros,
+    getDescricaoPatente,
+    getPatentes,
+    montarConsulta,
+    montarFiltros,
+)
+from componentes import (
+    montar_linha_planilha,
+    mostrar_card,
+    mostrar_detalhes,
+)
 st.set_page_config(
     page_title="Orion | Buscador de Patentes",
     page_icon="🔎",
     layout="wide",
 )
 st.markdown(
-    """
+     """
     <style>
-    @import url('https://fonts.cdnfonts.com/css/sf-pro-display');
-    html, body, [class*="css"], [data-testid="stAppViewContainer"] * {
+    @import url('https://cdnfonts.com');
+
+    /* 1. Fonte personalizada apenas nos textos e controles */
+    html, body, p, h1, h2, h3, h4, h5, h6, label, input, textarea, select, button {
         font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'San Francisco', sans-serif !important;
     }
-    /* os ícones do Streamlit são texto (ex: "keyboard_arrow_right") desenhado pela fonte Material Symbols,
-       então eles precisam voltar para essa fonte, senão aparecem escritos na tela */
+
+    /* 2. Preserva todos os ícones nativos do Streamlit */
     [data-testid="stIconMaterial"],
     [data-testid="stAlertDynamicIcon"],
     [data-testid="stToastDynamicIcon"],
     [data-testid="stHeadingIcon"],
     [data-testid="stMetricIcon"] {
         font-family: 'Material Symbols Rounded' !important;
+    }
+
+    /* 3. Trava a largura da sidebar APENAS quando estiver aberta */
+    [data-testid="stSidebar"][aria-expanded="true"] {
+        min-width: 280px !important;
+        max-width: 280px !important;
+        width: 280px !important;
+        border-right: 1px solid #1F2937;
+    }
+
+    /* 4. Permite que a sidebar recolha 100% quando estiver fechada */
+    [data-testid="stSidebar"][aria-expanded="false"] {
+        min-width: 0px !important;
+        max-width: 0px !important;
+        width: 0px !important;
+    }
+
+    /* 5. Desativa a alça de redimensionamento na borda sem quebrar o layout */
+    [data-testid="stSidebar"] > div:nth-child(2) {
+        pointer-events: none !important;
+        cursor: default !important;
+    }
+
+    /* 6. Ajusta o botão 'X' dentro do expander para não cortar o símbolo */
+    [data-testid="stSidebar"] [data-testid="stExpander"] button {
+        padding: 0px 8px !important;
+        min-height: 28px !important;
+        height: 28px !important;
+    }
+
+    /* 7. Estilo mais sóbrio para o botão principal (Gerar Planilha Excel) */
+    [data-testid="stSidebar"] button[kind="primary"] {
+        background-color: #2563EB !important;
+        border: 1px solid #3B82F6 !important;
+        color: #FFFFFF !important;
+        font-weight: 500 !important;
+        border-radius: 8px !important;
+        transition: all 0.2s ease-in-out;
+    }
+
+    [data-testid="stSidebar"] button[kind="primary"]:hover {
+        background-color: #1D4ED8 !important;
+        border-color: #60A5FA !important;
     }
     </style>
     """,
@@ -255,15 +311,69 @@ def main():
         st.session_state.patentes = None
 
     if "patente_selecionada" not in st.session_state:
-        st.session_state["patente_selecionada"] = None
+        st.session_state.patente_selecionada = None
+
+    if "patentes_salvas" not in st.session_state:
+        st.session_state.patentes_salvas = {}
 
     # Se o usuário clicou em uma patente, mostra SÓ a área dela:
     if st.session_state["patente_selecionada"] is not None:
         mostrar_detalhes(st.session_state["patente_selecionada"])
         return
 
+    # Barra lateral com o contador e botão de exportação sempre a mostra na tela normal
+    with st.sidebar:
+        st.header("Lista de Exportação")
+        qtd_salvas = len(st.session_state.patentes_salvas)
+        st.write(f"Patentes selecionadas: **{qtd_salvas}**")
+
+        if qtd_salvas > 0:
+            # 1. Lista individual com botão para remover cada patente
+            with st.expander("Ver / remover itens", expanded=True):
+                for pn_salvo in list(st.session_state.patentes_salvas.keys()):
+                    col_pn, col_rem = st.columns([4, 1], vertical_alignment="center")
+                    with col_pn:
+                        st.markdown(
+                            f"<span style='font-size: 13px; white-space: nowrap;'>• {pn_salvo}</span>",
+                            unsafe_allow_html=True
+                        )
+                    with col_rem:
+                        if st.button("✕", key=f"rem_{pn_salvo}", help=f"Remover {pn_salvo}"):
+                            del st.session_state.patentes_salvas[pn_salvo]
+                            st.rerun()
+
+            # 2. Botão para limpar toda a lista de uma vez
+            if st.button("Limpar tudo", use_container_width=True):
+                st.session_state.patentes_salvas = {}
+                st.rerun()
+
+            st.divider()
+
+            # 3. Geração e download da planilha Excel
+            if st.button("Gerar Planilha Excel", type="primary", use_container_width=True):
+                linhas = []
+                with st.spinner("Buscando descrições e montando planilha..."):
+                    for pn, pat in st.session_state.patentes_salvas.items():
+                        descricao = getDescricaoPatente(
+                            patent_id=pat.get("patent_id"),
+                            pn=pn
+                        )
+                        linhas.append(montar_linha_planilha(pat, descricao))
+
+                df_planilha = pd.DataFrame(linhas)
+                buffer = io.BytesIO()
+                df_planilha.to_excel(buffer, index=False, engine="openpyxl")
+
+                st.download_button(
+                    label="Baixar arquivo .xlsx",
+                    data=buffer.getvalue(),
+                    file_name="patentes_selecionadas.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
+
     # Caso contrário, mostra a tela normal de busca:
-    st.title("🔎 Searchent")
+    st.title("Searchent")
     st.caption("Explore patentes e encontre tecnologias para seus projetos.")
 
     mostrarFiltros()
