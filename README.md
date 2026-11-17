@@ -10,7 +10,7 @@ FrameWork: Streamlit
 Participantes:
 - Enrique(líder)
 - Alejandro
-- Thiagoa
+- Thiago
 - Lucas
 - Manoel
 - Evandro
