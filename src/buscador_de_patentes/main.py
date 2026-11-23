@@ -577,11 +577,11 @@ def main():
 
             st.plotly_chart(fig_empresas, use_container_width=True)
 
-        # --- COLOQUE ESTE TRECHO DENTRO DO SEU EXPANDER ---
+        #agora posso pegar os paises de cada empresa e fazer um gráfico ou mapa de países com mais patentes
 
         st.subheader("Distribuição Global de Patentes")
 
-        # Dicionário de conversão de Sigla ISO-2 para Nome em Inglês (aceito pelo Plotly)
+        # Dicionário de conversão de sigla na api para nome em inglês
         mapa_paises = {
             "BR": "Brazil", "US": "United States", "CN": "China", "JP": "Japan",
             "KR": "South Korea", "DE": "Germany", "FR": "France", "GB": "United Kingdom",
@@ -605,7 +605,7 @@ def main():
                 columns=["País", "Quantidade"]
             )
 
-            # Criando o mapa corrigido
+            #agora usando o plotly podemos criar um mapa
             fig = px.choropleth(
                 df_paises,
                 locations="País",
