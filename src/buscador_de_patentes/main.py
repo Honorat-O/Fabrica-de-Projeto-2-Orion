@@ -14,16 +14,19 @@ from api import (
     montarConsulta,
     montarFiltros,
 )
+
 from componentes import (
     montar_linha_planilha,
     mostrar_card,
     mostrar_detalhes,
 )
+
 st.set_page_config(
     page_title="Orion | Buscador de Patentes",
     page_icon="🔎",
     layout="wide",
 )
+
 st.markdown(
      """
     <style>
@@ -526,22 +529,6 @@ def main():
                 x="Ano",
                 y="Quantidade"
             )
-
-        #agora aqui eu fiz um gráfico de empresas com mais patentes
-        #primeiro eu fiz uma contagem de quanto cada empresa tem de patentes do tema
-
-        contagem_empresas = {}
-        for p in patentes:
-            empresa = p.get("current_assignee", "Não informado")
-
-            if empresa and empresa != "Não informado":
-                contagem_empresas[empresa] = (
-                    contagem_empresas.get(empresa, 0) + 1
-                )
-
-        #agora faço o grafico com o st.bar_chart
-        #quando tirarmos a limitação de pesquisa, da pra fazer algo como só aparecer as 20 que mais tem ou algo do tipo
-
 
         #agora aqui eu fiz um gráfico de empresas com mais patentes
         #primeiro eu fiz uma contagem de quanto cada empresa tem de patentes do tema
