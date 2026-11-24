@@ -182,11 +182,60 @@ def campoPeriodo(campo, versao):
     return inicio, fim
 
 # barra lateral com os filtros, eles só são aplicados quando o usuário clica em "Aplicar"
-def mostrarFiltros():
+def mostrarAbaLateral():
     filtros = st.session_state.filtros
     versao = st.session_state.versao_filtros
 
     with st.sidebar:
+        st.header("Lista de Exportação")
+        qtd_salvas = len(st.session_state.patentes_salvas)
+        st.write(f"Patentes selecionadas: **{qtd_salvas}**")
+
+        if qtd_salvas > 0:
+            # 1. Lista individual com botão para remover cada patente
+            with st.expander("Ver / remover itens", expanded=True):
+                for pn_salvo in list(st.session_state.patentes_salvas.keys()):
+                    col_pn, col_rem = st.columns([4, 1], vertical_alignment="center")
+                    with col_pn:
+                        st.markdown(
+                            f"<span style='font-size: 13px; white-space: nowrap;'>• {pn_salvo}</span>",
+                            unsafe_allow_html=True
+                        )
+                    with col_rem:
+                        if st.button("✕", key=f"rem_{pn_salvo}", help=f"Remover {pn_salvo}"):
+                            del st.session_state.patentes_salvas[pn_salvo]
+                            st.rerun()
+
+            # 2. Botão para limpar toda a lista de uma vez
+            if st.button("Limpar tudo", use_container_width=True):
+                st.session_state.patentes_salvas = {}
+                st.rerun()
+
+            # 3. Geração e download da planilha Excel
+            if st.button("Gerar Planilha Excel", type="primary", use_container_width=True):
+                linhas = []
+                with st.spinner("Buscando descrições e montando planilha..."):
+                    for pn, pat in st.session_state.patentes_salvas.items():
+                        descricao = getDescricaoPatente(
+                            patent_id=pat.get("patent_id"),
+                            pn=pn
+                        )
+                        linhas.append(montar_linha_planilha(pat, descricao))
+
+                df_planilha = pd.DataFrame(linhas)
+                buffer = io.BytesIO()
+                df_planilha.to_excel(buffer, index=False, engine="openpyxl")
+
+                st.download_button(
+                    label="Baixar arquivo .xlsx",
+                    data=buffer.getvalue(),
+                    file_name="patentes_selecionadas.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
+
+        st.divider()
+
         st.header("Filtros")
 
         with st.form("form_filtros", border=False):
@@ -326,61 +375,13 @@ def main():
         return
 
     # Barra lateral com o contador e botão de exportação sempre a mostra na tela normal
-    with st.sidebar:
-        st.header("Lista de Exportação")
-        qtd_salvas = len(st.session_state.patentes_salvas)
-        st.write(f"Patentes selecionadas: **{qtd_salvas}**")
-
-        if qtd_salvas > 0:
-            # 1. Lista individual com botão para remover cada patente
-            with st.expander("Ver / remover itens", expanded=True):
-                for pn_salvo in list(st.session_state.patentes_salvas.keys()):
-                    col_pn, col_rem = st.columns([4, 1], vertical_alignment="center")
-                    with col_pn:
-                        st.markdown(
-                            f"<span style='font-size: 13px; white-space: nowrap;'>• {pn_salvo}</span>",
-                            unsafe_allow_html=True
-                        )
-                    with col_rem:
-                        if st.button("✕", key=f"rem_{pn_salvo}", help=f"Remover {pn_salvo}"):
-                            del st.session_state.patentes_salvas[pn_salvo]
-                            st.rerun()
-
-            # 2. Botão para limpar toda a lista de uma vez
-            if st.button("Limpar tudo", use_container_width=True):
-                st.session_state.patentes_salvas = {}
-                st.rerun()
-
-            st.divider()
-
-            # 3. Geração e download da planilha Excel
-            if st.button("Gerar Planilha Excel", type="primary", use_container_width=True):
-                linhas = []
-                with st.spinner("Buscando descrições e montando planilha..."):
-                    for pn, pat in st.session_state.patentes_salvas.items():
-                        descricao = getDescricaoPatente(
-                            patent_id=pat.get("patent_id"),
-                            pn=pn
-                        )
-                        linhas.append(montar_linha_planilha(pat, descricao))
-
-                df_planilha = pd.DataFrame(linhas)
-                buffer = io.BytesIO()
-                df_planilha.to_excel(buffer, index=False, engine="openpyxl")
-
-                st.download_button(
-                    label="Baixar arquivo .xlsx",
-                    data=buffer.getvalue(),
-                    file_name="patentes_selecionadas.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True
-                )
+        
 
     # Tela normal de busca
     st.title("Searchent")
     st.caption("Explore patentes e encontre tecnologias para seus projetos.")
 
-    mostrarFiltros()
+    mostrarAbaLateral()
 
     with st.form("form_busca_patente", border=False):
         tipo_pesquisa = st.selectbox("Tipo de pesquisa", list(TIPOS_PESQUISA.keys()), label_visibility="collapsed")
