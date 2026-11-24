@@ -181,18 +181,21 @@ def campoPeriodo(campo, versao):
 
     return inicio, fim
 
-# barra lateral com os filtros, eles só são aplicados quando o usuário clica em "Aplicar"
+# Barra lateral com funcionalidade de exportção e filtragem 
 def mostrarAbaLateral():
+    # Váriaveis constantes durante a execução do main
     filtros = st.session_state.filtros
     versao = st.session_state.versao_filtros
 
+    # Abre sidebar para implementação das funcionalidades
     with st.sidebar:
+        # Feature de exportação
         st.header("Lista de Exportação")
         qtd_salvas = len(st.session_state.patentes_salvas)
         st.write(f"Patentes selecionadas: **{qtd_salvas}**")
 
         if qtd_salvas > 0:
-            # 1. Lista individual com botão para remover cada patente
+            # Lista individual com botão para remover cada patente
             with st.expander("Ver / remover itens", expanded=True):
                 for pn_salvo in list(st.session_state.patentes_salvas.keys()):
                     col_pn, col_rem = st.columns([4, 1], vertical_alignment="center")
@@ -206,12 +209,12 @@ def mostrarAbaLateral():
                             del st.session_state.patentes_salvas[pn_salvo]
                             st.rerun()
 
-            # 2. Botão para limpar toda a lista de uma vez
+            # Botão para limpar toda a lista de uma vez
             if st.button("Limpar tudo", use_container_width=True):
                 st.session_state.patentes_salvas = {}
                 st.rerun()
 
-            # 3. Geração e download da planilha Excel
+            # Geração e download da planilha Excel
             if st.button("Gerar Planilha Excel", type="primary", use_container_width=True):
                 linhas = []
                 with st.spinner("Buscando descrições e montando planilha..."):
@@ -236,8 +239,8 @@ def mostrarAbaLateral():
 
         st.divider()
 
+        # Feature de filtragem
         st.header("Filtros")
-
         with st.form("form_filtros", border=False):
             with st.expander("Período", expanded="PBD" in filtros or "APD" in filtros):
                 st.caption("Data de publicação")
@@ -374,13 +377,11 @@ def main():
         mostrar_detalhes(st.session_state["patente_selecionada"])
         return
 
-    # Barra lateral com o contador e botão de exportação sempre a mostra na tela normal
-        
-
     # Tela normal de busca
     st.title("Searchent")
     st.caption("Explore patentes e encontre tecnologias para seus projetos.")
 
+    # Chama função para a aba lateral
     mostrarAbaLateral()
 
     with st.form("form_busca_patente", border=False):
