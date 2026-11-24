@@ -97,6 +97,7 @@ st.markdown(
 MAXIMO_PATENTES = 100
 ITENS_POR_PAGINA = 10
 
+# tipos de pesquisa usada no selectbox tipo_pesquisa
 TIPOS_PESQUISA = {
     "Palavras-chave": "TACD",
     "Título": "TTL",
@@ -308,8 +309,8 @@ def mostrarAbaLateral():
             trocarFiltros(novos_filtros)
 
 # texto curto de cada filtro aplicado, ex: "01/01/2020 a 31/12/2025"
-def descreverFiltro(campo, valor):
-    if campo in ("APD", "PBD"):
+def descreverFiltro(chave, valor):
+    if chave in ("APD", "PBD"):
         inicio, fim = valor
 
         if inicio and fim:
@@ -320,30 +321,34 @@ def descreverFiltro(campo, valor):
 
         return f"até {fim:%d/%m/%Y}"
 
-    if campo == "AUTHORITY":
+    if chave == "AUTHORITY":
         return ", ".join(valor)
 
     return valor
 
 # mostra os filtros aplicados acima dos resultados, clicar em um deles remove o filtro
 def mostrarFiltrosAplicados():
+    # Váriavel constante durante a execução do main
     filtros = st.session_state.filtros
 
+    # Se não houver filtro ele retorna e nada acontece
     if not filtros:
         return
 
+    # Inicia um container que mostra todos os filtros aplicados
     with st.container(horizontal=True, vertical_alignment="center"):
         st.caption("Filtros aplicados:")
 
-        for campo, valor in filtros.items():
+        # Para cada par chave e valor em filtros ele cria um botão que exibe os filtros e caso o botão for clicado ele remove o filtro
+        for chave, valor in filtros.items():
             if st.button(
-                f"{NOMES_FILTROS[campo]}: {descreverFiltro(campo, valor)}",
-                key=f"remover_filtro_{campo}",
+                f"{NOMES_FILTROS[chave]}: {descreverFiltro(chave, valor)}",
+                key=f"remover_filtro_{chave}",
                 icon=":material/close:",
                 help="Remover filtro",
             ):
                 novos_filtros = dict(filtros)
-                del novos_filtros[campo]
+                del novos_filtros[chave]
                 trocarFiltros(novos_filtros)
 
 def main():
@@ -384,12 +389,17 @@ def main():
     # Chama função para a aba lateral
     mostrarAbaLateral()
 
+    # Cria um formulário para busca da patente
     with st.form("form_busca_patente", border=False):
+        # Cria uma caixa de seleção para o tipo da pesquisa
         tipo_pesquisa = st.selectbox("Tipo de pesquisa", list(TIPOS_PESQUISA.keys()), label_visibility="collapsed")
 
+        # Organiza o layout de busca e botão buscar em colunas (a coluna_busca recebe 5 partes da largura disponível e a coluna_botao recebe 1 parte da largura disponível)
         coluna_busca, coluna_botao = st.columns([5, 1])
 
+        # Utiliza coluna_busca
         with coluna_busca:
+            # Inicia input para busca
             patente = st.text_input(
                 "Termo de busca",
                 type="search",
@@ -397,12 +407,15 @@ def main():
                 label_visibility="collapsed",
             )
 
+        # Utiliza coluna_botao
         with coluna_botao:
+            # Inicia botão de buscar
             enviado = st.form_submit_button(
                 "Buscar",
                 use_container_width=True,
             )
 
+    # Inicializa a função mostrarFiltrosAplicados()
     mostrarFiltrosAplicados()
 
     st.divider()
@@ -497,7 +510,7 @@ def main():
     else:
         st.caption(f"{total_formatado} patentes encontradas.")
 
-    paginas =math.ceil(len(patentes) / ITENS_POR_PAGINA)
+    paginas = math.ceil(len(patentes) / ITENS_POR_PAGINA)
     offset = (st.session_state.pagina_atual - 1) * ITENS_POR_PAGINA
     patentes_pagina = patentes[offset:offset + ITENS_POR_PAGINA]
 
