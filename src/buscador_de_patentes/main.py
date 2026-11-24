@@ -156,8 +156,8 @@ def trocarFiltros(filtros):
     st.rerun()
 
 # dois campos de data (De / Até) para os filtros de período
-def campoPeriodo(campo, versao):
-    inicio, fim = st.session_state.filtros.get(campo, (None, None))
+def campoPeriodo(chave, versao):
+    inicio, fim = st.session_state.filtros.get(chave, (None, None))
     coluna_inicio, coluna_fim = st.columns(2)
 
     with coluna_inicio:
@@ -167,7 +167,7 @@ def campoPeriodo(campo, versao):
             min_value=DATA_MINIMA,
             max_value=date.today(),
             format="DD/MM/YYYY",
-            key=f"{campo}_inicio_{versao}",
+            key=f"{chave}_inicio_{versao}",
         )
 
     with coluna_fim:
@@ -177,7 +177,7 @@ def campoPeriodo(campo, versao):
             min_value=DATA_MINIMA,
             max_value=date.today(),
             format="DD/MM/YYYY",
-            key=f"{campo}_fim_{versao}",
+            key=f"{chave}_fim_{versao}",
         )
 
     return inicio, fim
@@ -242,7 +242,10 @@ def mostrarAbaLateral():
 
         # Feature de filtragem
         st.header("Filtros")
+
+        # Cria formulário de filtros
         with st.form("form_filtros", border=False):
+            # Cria quatro expanders para cada opção de filtragem
             with st.expander("Período", expanded="PBD" in filtros or "APD" in filtros):
                 st.caption("Data de publicação")
                 pbd_inicio, pbd_fim = campoPeriodo("PBD", versao)
@@ -271,21 +274,27 @@ def mostrarAbaLateral():
 
             st.caption("Para informar mais de um valor, separe com ponto e vírgula (;).")
 
+            # Organiza o layout em colunas
             coluna_aplicar, coluna_limpar = st.columns(2)
 
+            # Cria botão aplicar dentro da coluna_aplicar
             with coluna_aplicar:
                 aplicar = st.form_submit_button("Aplicar", width="stretch")
 
+            # Cria botão limpar dentro da coluna_limpar
             with coluna_limpar:
                 limpar = st.form_submit_button("Limpar", width="stretch")
 
+    # Se o botão limpar for apertado ele limpa os filtros para um dicionário vázio
     if limpar:
         trocarFiltros({})
 
+    # Se o botão aplicar for apertado ele atualiza os filtros
     if aplicar:
-        # só entram os filtros que foram preenchidos
+        # Cria um dicionário para os novos filtros
         novos_filtros = {}
 
+        # Vai adicionando valores em chaves no dicionário novos_filtros
         if pbd_inicio or pbd_fim:
             novos_filtros["PBD"] = (pbd_inicio, pbd_fim)
 
@@ -299,12 +308,14 @@ def mostrarAbaLateral():
             if valor.strip(" ;"):
                 novos_filtros[campo] = valor.strip(" ;")
 
+        # Transforma os filtros da barra lateral em query text para realizar a filtragem
         try:
             montarFiltros(novos_filtros)
         except ValueError as erro:
             st.sidebar.warning(str(erro))
             return
 
+        # Se os novos_filtros forem diferentes dos filtros atuais troca os filtros
         if novos_filtros != filtros:
             trocarFiltros(novos_filtros)
 
