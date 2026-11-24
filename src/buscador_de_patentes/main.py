@@ -22,9 +22,8 @@ from componentes import (
 )
 
 st.set_page_config(
-    page_title="Orion | Buscador de Patentes",
-    page_icon="🔎",
-    layout="wide",
+    page_title="Searchent",
+    layout="wide"
 )
 
 st.markdown(
