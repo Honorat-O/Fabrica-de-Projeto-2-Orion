@@ -27,14 +27,15 @@ st.set_page_config(
 st.markdown(
      """
     <style>
+    /* Site usado para as fontes */
     @import url('https://cdnfonts.com');
 
-    /* 1. Fonte personalizada apenas nos textos e controles */
+    /* Fonte personalizada apenas nos textos e controles */
     html, body, p, h1, h2, h3, h4, h5, h6, label, input, textarea, select, button {
         font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'San Francisco', sans-serif !important;
     }
 
-    /* 2. Preserva todos os ícones nativos do Streamlit */
+    /* Preserva todos os ícones nativos do streamlit */
     [data-testid="stIconMaterial"],
     [data-testid="stAlertDynamicIcon"],
     [data-testid="stToastDynamicIcon"],
@@ -43,7 +44,7 @@ st.markdown(
         font-family: 'Material Symbols Rounded' !important;
     }
 
-    /* 3. Trava a largura da sidebar APENAS quando estiver aberta */
+    /* Trava a largura da sidebar APENAS quando estiver aberta */
     [data-testid="stSidebar"][aria-expanded="true"] {
         min-width: 280px !important;
         max-width: 280px !important;
@@ -51,27 +52,28 @@ st.markdown(
         border-right: 1px solid #1F2937;
     }
 
-    /* 4. Permite que a sidebar recolha 100% quando estiver fechada */
+    /* Permite que a sidebar recolha 100% quando estiver fechada */
     [data-testid="stSidebar"][aria-expanded="false"] {
         min-width: 0px !important;
         max-width: 0px !important;
         width: 0px !important;
     }
 
-    /* 5. Desativa a alça de redimensionamento na borda sem quebrar o layout */
+    /* Desativa a alça de redimensionamento na borda sem quebrar o layout */
+    /* O usuário já não pode mover a aba lateral */
     [data-testid="stSidebar"] > div:nth-child(2) {
         pointer-events: none !important;
         cursor: default !important;
     }
 
-    /* 6. Ajusta o botão 'X' dentro do expander para não cortar o símbolo */
+    /* Ajusta o botão 'X' dentro do expander para não cortar o símbolo */
     [data-testid="stSidebar"] [data-testid="stExpander"] button {
         padding: 0px 8px !important;
         min-height: 28px !important;
         height: 28px !important;
     }
 
-    /* 7. Estilo mais sóbrio para o botão principal (Gerar Planilha Excel) */
+    /* Estilo mais sóbrio para o botão principal (Gerar Planilha Excel) */
     [data-testid="stSidebar"] button[kind="primary"] {
         background-color: #2563EB !important;
         border: 1px solid #3B82F6 !important;
@@ -316,7 +318,7 @@ def main():
     if "patentes_salvas" not in st.session_state:
         st.session_state.patentes_salvas = {}
 
-    # Se o usuário clicou em uma patente, mostra SÓ a área dela:
+    # Se o usuário clicou em uma patente, mostra a área dela:
     if st.session_state["patente_selecionada"] is not None:
         mostrar_detalhes(st.session_state["patente_selecionada"])
         return
@@ -372,7 +374,7 @@ def main():
                     use_container_width=True
                 )
 
-    # Caso contrário, mostra a tela normal de busca:
+    # Tela normal de busca
     st.title("Searchent")
     st.caption("Explore patentes e encontre tecnologias para seus projetos.")
 
